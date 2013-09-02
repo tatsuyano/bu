@@ -1,0 +1,65 @@
+#!/usr/bin/env perl
+use strict;
+use constant DELETED_STDOUT    => "\x1b[1A";
+use constant INITIALIZE_STDOUT => " ";
+
+my $dir = $ARGV[0] || ".";
+my $info = file_info($dir);
+
+printf INITIALIZE_STDOUT;
+print_info($info);
+
+sub file_info {
+  my $dir = shift;
+  my @list = ();
+  my $info = { file_size   => 0,
+               directories => 0,
+               files       => 0 };
+
+  opendir(DIR, $dir) or die("Can not open directory:$dir ($!)");
+  @list = readdir(DIR);
+  closedir(DIR);
+
+  foreach my $file (sort @list){
+    next if $file =~ /^\.{1,2}$/;
+
+    if( -d "$dir/$file" ){
+      my $hash = file_info("$dir/$file");
+      $info->{file_size}   += $hash->{file_size};
+      $info->{directories} += $hash->{directories};
+      $info->{files}       += $hash->{files};
+
+      $info->{directories}++;
+    }else{
+      $info->{file_size} += -s "$dir/$file";
+      $info->{files}++;
+    }
+  }
+
+  print_info($info);
+  printf DELETED_STDOUT;
+  return $info;
+}
+
+sub print_info {
+  my $info = shift;
+  
+  printf "%d directories, %d files, %s\n",
+    $info->{directories},
+    $info->{files},
+    format_kmgt($info->{file_size});
+}
+
+sub format_kmgt {
+  my $byte = shift;
+  my @prefix = ("B","K","M","G","T");  
+
+  while(1024 < $byte){
+    $byte = $byte / 1024;
+    shift @prefix;
+  }
+
+  return sprintf "%.1f%s",$byte,shift @prefix; 
+}
+
+1;
